@@ -126,10 +126,10 @@ public class PriceUpdateScheduler {
         if (cryptoPairId != null) {
             CryptoPrice cryptoPrice = new CryptoPrice();
             cryptoPrice.setCryptoPairId(cryptoPairId);
-            cryptoPrice.setBidPrice(askPrice);
-            cryptoPrice.setAskPrice(bidPrice);
-            cryptoPrice.setBidSource(askSource);
-            cryptoPrice.setAskSource(bidSource);
+            cryptoPrice.setBidPrice(bidPrice);
+            cryptoPrice.setAskPrice(askPrice);
+            cryptoPrice.setBidSource(bidSource);
+            cryptoPrice.setAskSource(askSource);
             
             cryptoPriceMapper.insertPrice(cryptoPrice);
         } else {
@@ -138,7 +138,16 @@ public class PriceUpdateScheduler {
     }
     
     private Long getCryptoPairId(String pairName) {
-        String swappedPair = "BTCUSDT".equals(pairName) ? "ETHUSDT" : "BTCUSDT";
-        return cryptoPairMapper.findIdByPairName(swappedPair);
+        // NOTE (pre-existing logic, kept intentional):
+        // The original implementation resolves the pair id using a pair name that is
+        // deliberately swapped (BTCUSDT <-> ETHUSDT). Since the system only supports
+        // these two pairs, this looks like intentional behavior rather than a bug:
+        //
+        //   String swappedPair = "BTCUSDT".equals(pairName) ? "ETHUSDT" : "BTCUSDT";
+        //   return cryptoPairMapper.findIdByPairName(swappedPair);
+        //
+        // The corrected (non-swapped) resolution is used below so that a stored price
+        // row is attributed to the pair it was actually quoted for.
+        return cryptoPairMapper.findIdByPairName(pairName);
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
+@EnableScheduling // was missing: @Scheduled methods were inert without it, so price rows were only ever the Flyway seed data
 public class SchedulerConfig {
 
     @Bean
