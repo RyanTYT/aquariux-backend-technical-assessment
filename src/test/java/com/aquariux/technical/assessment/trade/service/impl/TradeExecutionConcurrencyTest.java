@@ -48,13 +48,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Deliberate stress settings: the H2 default 1s lock timeout is kept (no
  * override) as a tripwire — any lock timeout lands in "unexpected" and fails
  * the test, signalling the engine is too slow under contention. The Hikari
- * pool is raised to 100 connections so all virtual threads contend on the
- * database at once instead of queueing on the pool.
+ * pool (maximum-pool-size=100 in application.yml) matches the 100 concurrent
+ * trades scenario so all virtual threads contend on the database at once
+ * instead of queueing on the pool.
  */
 @Slf4j
-@SpringBootTest(properties = {
-        "spring.datasource.hikari.maximum-pool-size=100",
-        "spring.datasource.hikari.minimum-idle=100"})
+@SpringBootTest
 class TradeExecutionConcurrencyTest {
 
     @Autowired

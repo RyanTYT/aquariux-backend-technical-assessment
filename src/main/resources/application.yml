@@ -5,7 +5,14 @@ spring:
     url: jdbc:h2:mem:aquariux
     driver-class-name: org.h2.Driver
     username: sa
-    password: 
+    password:
+    hikari:
+      # Business target: >= 100 simultaneous trades. Each in-flight trade
+      # holds exactly one connection for its transaction; with the default
+      # pool of 10 the remaining ~90 requests only wait on the pool, which
+      # dominates trade latency under burst load. Size matches the target.
+      maximum-pool-size: 100
+      minimum-idle: 100
   h2:
     console:
       enabled: true
