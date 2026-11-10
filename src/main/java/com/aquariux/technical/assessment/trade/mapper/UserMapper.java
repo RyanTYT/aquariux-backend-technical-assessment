@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Select;
 public interface UserMapper {
 
     @Select("""
-            SELECT COUNT(*) > 0 FROM users WHERE id = #{userId}
+            SELECT EXISTS(SELECT 1 FROM users WHERE id = #{userId})
             """)
     boolean existsById(Long userId);
 }
