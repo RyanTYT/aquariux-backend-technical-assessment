@@ -260,10 +260,20 @@ class TradeExecutionConcurrencyTest {
         }
 
         // Latency report: loose regression bound only (not an SLA) — the real
-        // speed tripwire is the 1s H2 lock timeout above.
-        double avgMillis = result.latenciesNanos().stream().mapToLong(Long::longValue).average().orElse(0) / 1_000_000.0;
-        long maxMillis = result.latenciesNanos().stream().mapToLong(Long::longValue).max().orElse(0) / 1_000_000;
-        log.info("Concurrency latency ({} trades): avg {} ms, max {} ms", requests.size(), avgMillis, maxMillis);
+        // speed tripwire is the 1s H2 lock timeout above. Percentiles help
+        // tuning work: avg alone hides the tail (contention outliers).
+        List<Long> latenciesMillis = result.latenciesNanos().stream()
+                .mapToLong(nanos -> nanos / 1_000_000)
+                .sorted()
+                .boxed()
+                .toList();
+        double avgMillis = latenciesMillis.stream().mapToLong(Long::longValue).average().orElse(0);
+        long p50Millis = latenciesMillis.get((latenciesMillis.size() - 1) / 2);
+        int p99Index = Math.max(0, (int) Math.ceil(latenciesMillis.size() * 0.99) - 1);
+        long p99Millis = latenciesMillis.get(p99Index);
+        long maxMillis = latenciesMillis.get(latenciesMillis.size() - 1);
+        log.info("Concurrency latency ({} trades): avg {} ms, p50 {} ms, p99 {} ms, max {} ms",
+                requests.size(), avgMillis, p50Millis, p99Millis, maxMillis);
         assertThat(avgMillis).as("average per-trade latency under 100-way contention").isLessThan(100);
     }
 
