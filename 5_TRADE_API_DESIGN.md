@@ -65,7 +65,34 @@ Two behaviors in `PriceUpdateScheduler` were examined closely:
 
 ## 7. Other assumptions
 
-- **Price staleness:** no staleness guard is applied — a trade executes against the newest stored price even if the scheduler is temporarily failing upstream. Documented as an accepted assumption ("automated recovery from external API failures" is a stated success metric owned by the scheduler, not the trade path).
+- **Price freshness via cache:** the trade path reads prices from `LatestPriceCache`, which is only updated by the scheduler tick (and hydrated from the DB on first access after a cold start). Missing-price (503) applies when neither cache nor DB has a row. This is the same tick-freshness semantics as reading the table directly, minus one query per trade.
+
+## 8. Latency work (measured)
+
+Sequence of committed optimizations, measured with the class-only benchmark
+(`mvn test -Dtest=TradeExecutionConcurrencyTest`, 100 fully-funded trades under
+100-way contention, median of 4 runs):
+
+| State | avg | p50 | p99 |
+|---|---|---|---|
+| Baseline (full engine + tests, no latency work) | 5.9 ms | 3 ms | 37 ms |
+| + price lookup index | 10.6 ms | 3 ms | 74 ms |
+| + Hikari pool sized to 100 | 8.3 ms | 3 ms | 61 ms |
+| + `SELECT EXISTS` user probe | 8.4 ms | 3 ms | 59 ms |
+| + in-memory latest-price cache | 4.9 ms | 3 ms | 23 ms |
+| + virtual threads (final) | **3.8 ms** | **2 ms** | **21 ms** |
+
+**Net: avg −36%, p50 −33%, p99 −43%.**
+
+Honest notes from this exercise:
+
+- The index commit alone shows a *penalty* on this tiny dataset (an index read really is slower than scanning 4 rows) — its value is the O(log n) growth behavior, realized by the hydrate-on-miss path and any direct query of `crypto_prices`, and tested at scale would flip sign. The cache bypasses per-trade price reads entirely, which is where the real win is.
+- Intermediate states (index through `EXISTS`) measured slower than baseline while retaining the per-trade DB price read; the cache is what removes that path.
+- Benchmark pitfalls found along the way: uniform ~30 ms per-trade elevation appears when background load (Docker VM, Spotlight) saturates the box, and full-suite runs share the JVM with the `contextLoads` context whose **live scheduler** performs Binance/Huobi HTTP + inserts during the benchmark — class-only runs are the clean measurement. Any per-code-state A/B here needs interleaved runs; single-run contrasts were misleading twice.
+- The debit/credit statement pair, guarded-debit design and canonical lock ordering were deliberately left alone: at this scale their statement cost is dominated by commit contention, and collapsing them would trade demonstrable correctness for ~1 statement. H2's default 1s lock timeout kept as the tripwire.
+
+## 9. Remaining assumptions (carried from the original list)
+
 - **Case handling:** `pairName` is trimmed and upper-cased before lookup; symbols are resolved from the database (base/quote ids come from a join on `crypto_pairs`/`symbols`), not from parsing strings.
 - **User existence:** although users are assumed pre-authenticated, an unknown `userId` is still rejected (404) since nothing guarantees callers only send seeded ids.
 - **Only BUY/SELL are accepted** (enforced by the `TradeType` enum and the DB `CHECK` constraint).
