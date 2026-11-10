@@ -2,6 +2,7 @@ package com.aquariux.technical.assessment.trade.service.impl;
 
 import com.aquariux.technical.assessment.trade.dto.request.TradeRequest;
 import com.aquariux.technical.assessment.trade.dto.response.TradeResponse;
+import com.aquariux.technical.assessment.trade.cache.LatestPriceCache;
 import com.aquariux.technical.assessment.trade.enums.TradeType;
 import com.aquariux.technical.assessment.trade.exception.InsufficientBalanceException;
 import com.aquariux.technical.assessment.trade.scheduler.PriceUpdateScheduler;
@@ -62,6 +63,8 @@ class TradeExecutionConcurrencyTest {
     private JdbcTemplate jdbcTemplate;
     @MockitoBean
     private PriceUpdateScheduler priceUpdateScheduler;
+    @Autowired
+    private LatestPriceCache latestPriceCache;
 
     /** userId -> (symbolId -> seeded balance), mirroring V3 seed data. */
     private static final Map<Long, Map<Long, String>> SEED_WALLETS = Map.of(
@@ -80,6 +83,7 @@ class TradeExecutionConcurrencyTest {
     void resetSeedData() {
         // Restore the exact V3 seed state so every test starts deterministic.
         jdbcTemplate.update("DELETE FROM trades");
+        latestPriceCache.clear(); // scheduler-mocked away: drop stale cached prices from the previous test
         jdbcTemplate.update("DELETE FROM crypto_prices");
         jdbcTemplate.update("DELETE FROM user_wallets");
 
@@ -96,6 +100,10 @@ class TradeExecutionConcurrencyTest {
                 (1, 90, 100, 'TEST', 'TEST'),
                 (2, 50, 60, 'TEST', 'TEST')
                 """);
+        // Pre-warm the cache so the 100-thread burst never races the
+        // hydrate-on-miss path inside the first trades' transactions.
+        latestPriceCache.getLatestForPair(1L);
+        latestPriceCache.getLatestForPair(2L);
     }
 
     @Test

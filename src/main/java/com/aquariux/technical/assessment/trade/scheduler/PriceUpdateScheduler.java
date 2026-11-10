@@ -1,5 +1,6 @@
 package com.aquariux.technical.assessment.trade.scheduler;
 
+import com.aquariux.technical.assessment.trade.cache.LatestPriceCache;
 import com.aquariux.technical.assessment.trade.entity.CryptoPrice;
 import com.aquariux.technical.assessment.trade.mapper.CryptoPairMapper;
 import com.aquariux.technical.assessment.trade.mapper.CryptoPriceMapper;
@@ -21,6 +22,7 @@ public class PriceUpdateScheduler {
     private final RestTemplate restTemplate;
     private final CryptoPairMapper cryptoPairMapper;
     private final CryptoPriceMapper cryptoPriceMapper;
+    private final LatestPriceCache latestPriceCache;
 
     private static final String BINANCE_URL = "https://api.binance.com/api/v3/ticker/bookTicker";
     private static final String HUOBI_URL = "https://api.huobi.pro/market/tickers";
@@ -132,6 +134,9 @@ public class PriceUpdateScheduler {
             cryptoPrice.setAskSource(askSource);
             
             cryptoPriceMapper.insertPrice(cryptoPrice);
+            // The fresh row is what "latest price" now means; publish it so
+            // trade execution reads it from memory instead of the database.
+            latestPriceCache.put(cryptoPairId, cryptoPrice);
         } else {
             log.warn("Crypto pair not found: {}", pairName);
         }

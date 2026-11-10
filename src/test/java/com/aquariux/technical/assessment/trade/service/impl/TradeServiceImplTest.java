@@ -12,7 +12,7 @@ import com.aquariux.technical.assessment.trade.exception.InvalidTradeRequestExce
 import com.aquariux.technical.assessment.trade.exception.PriceNotAvailableException;
 import com.aquariux.technical.assessment.trade.exception.UserNotFoundException;
 import com.aquariux.technical.assessment.trade.mapper.CryptoPairMapper;
-import com.aquariux.technical.assessment.trade.mapper.CryptoPriceMapper;
+import com.aquariux.technical.assessment.trade.cache.LatestPriceCache;
 import com.aquariux.technical.assessment.trade.mapper.TradeMapper;
 import com.aquariux.technical.assessment.trade.mapper.UserMapper;
 import com.aquariux.technical.assessment.trade.service.WalletServiceInterface;
@@ -49,7 +49,7 @@ class TradeServiceImplTest {
     @Mock
     private CryptoPairMapper cryptoPairMapper;
     @Mock
-    private CryptoPriceMapper cryptoPriceMapper;
+    private LatestPriceCache latestPriceCache;
     @Mock
     private TradeMapper tradeMapper;
     @Mock
@@ -105,7 +105,7 @@ class TradeServiceImplTest {
         stubSuccessfulInsert();
         when(userMapper.existsById(USER_ID)).thenReturn(true);
         when(cryptoPairMapper.findActiveByPairName("BTCUSDT")).thenReturn(btcUsdt);
-        when(cryptoPriceMapper.findLatestByPairName("BTCUSDT")).thenReturn(latestPrice);
+        when(latestPriceCache.getLatestForPair(1L)).thenReturn(latestPrice);
 
         TradeResponse response = tradeService.executeTrade(request);
 
@@ -141,7 +141,7 @@ class TradeServiceImplTest {
 
         when(userMapper.existsById(USER_ID)).thenReturn(true);
         when(cryptoPairMapper.findActiveByPairName("BTCUSDT")).thenReturn(btcUsdt);
-        when(cryptoPriceMapper.findLatestByPairName("BTCUSDT")).thenReturn(latestPrice);
+        when(latestPriceCache.getLatestForPair(1L)).thenReturn(latestPrice);
 
         TradeResponse response = tradeService.executeTrade(request);
 
@@ -163,7 +163,7 @@ class TradeServiceImplTest {
     void insufficientBalanceRejectsTradeWithoutSideEffects() {
         when(userMapper.existsById(USER_ID)).thenReturn(true);
         when(cryptoPairMapper.findActiveByPairName("BTCUSDT")).thenReturn(btcUsdt);
-        when(cryptoPriceMapper.findLatestByPairName("BTCUSDT")).thenReturn(latestPrice);
+        when(latestPriceCache.getLatestForPair(1L)).thenReturn(latestPrice);
         doThrow(new InsufficientBalanceException())
                 .when(walletService).debit(eq(USER_ID), eq(USDT_SYMBOL_ID), any(BigDecimal.class));
 
@@ -189,7 +189,7 @@ class TradeServiceImplTest {
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("1");
 
-        verifyNoInteractions(cryptoPairMapper, cryptoPriceMapper, walletService, tradeMapper);
+        verifyNoInteractions(cryptoPairMapper, latestPriceCache, walletService, tradeMapper);
     }
 
     @Test
@@ -201,7 +201,7 @@ class TradeServiceImplTest {
         assertThatThrownBy(() -> tradeService.executeTrade(request))
                 .isInstanceOf(CryptoPairNotFoundException.class);
 
-        verifyNoInteractions(cryptoPriceMapper, walletService, tradeMapper);
+        verifyNoInteractions(latestPriceCache, walletService, tradeMapper);
     }
 
     @Test
@@ -210,7 +210,7 @@ class TradeServiceImplTest {
         request.setPairName(" btcusdt ");
         when(userMapper.existsById(USER_ID)).thenReturn(true);
         when(cryptoPairMapper.findActiveByPairName("BTCUSDT")).thenReturn(btcUsdt);
-        when(cryptoPriceMapper.findLatestByPairName("BTCUSDT")).thenReturn(latestPrice);
+        when(latestPriceCache.getLatestForPair(1L)).thenReturn(latestPrice);
 
         TradeResponse response = tradeService.executeTrade(request);
 
@@ -223,7 +223,7 @@ class TradeServiceImplTest {
     void missingPriceRejectsTrade() {
         when(userMapper.existsById(USER_ID)).thenReturn(true);
         when(cryptoPairMapper.findActiveByPairName("BTCUSDT")).thenReturn(btcUsdt);
-        when(cryptoPriceMapper.findLatestByPairName("BTCUSDT")).thenReturn(null);
+        when(latestPriceCache.getLatestForPair(1L)).thenReturn(null);
 
         assertThatThrownBy(() -> tradeService.executeTrade(request))
                 .isInstanceOf(PriceNotAvailableException.class)
@@ -238,7 +238,7 @@ class TradeServiceImplTest {
         assertThatThrownBy(() -> tradeService.executeTrade(invalid))
                 .isInstanceOf(InvalidTradeRequestException.class);
 
-        verifyNoInteractions(userMapper, cryptoPairMapper, cryptoPriceMapper, walletService, tradeMapper);
+        verifyNoInteractions(userMapper, cryptoPairMapper, latestPriceCache, walletService, tradeMapper);
     }
 
     private static Stream<TradeRequest> invalidRequests() {

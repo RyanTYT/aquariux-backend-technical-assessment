@@ -29,9 +29,9 @@ public interface CryptoPriceMapper {
                    cp.bid_source as bidSource, cp.ask_source as askSource, cp.created_at as createdAt, pair.pair_name as pairName
             FROM crypto_prices cp
             INNER JOIN crypto_pairs pair ON cp.crypto_pair_id = pair.id
-            WHERE pair.pair_name = #{pairName}
+            WHERE cp.crypto_pair_id = #{pairId}
             ORDER BY cp.created_at DESC, cp.id DESC
             LIMIT 1
             """)
-    CryptoPrice findLatestByPairName(String pairName);
+    CryptoPrice findLatestByPairId(Long pairId);
 }

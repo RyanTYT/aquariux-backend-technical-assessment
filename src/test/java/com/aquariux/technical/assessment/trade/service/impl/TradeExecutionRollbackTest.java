@@ -3,6 +3,7 @@ package com.aquariux.technical.assessment.trade.service.impl;
 import com.aquariux.technical.assessment.trade.dto.request.TradeRequest;
 import com.aquariux.technical.assessment.trade.dto.response.TradeResponse;
 import com.aquariux.technical.assessment.trade.entity.Trade;
+import com.aquariux.technical.assessment.trade.cache.LatestPriceCache;
 import com.aquariux.technical.assessment.trade.enums.TradeType;
 import com.aquariux.technical.assessment.trade.mapper.TradeMapper;
 import com.aquariux.technical.assessment.trade.scheduler.PriceUpdateScheduler;
@@ -50,6 +51,8 @@ class TradeExecutionRollbackTest {
     @MockitoBean
     private PriceUpdateScheduler priceUpdateScheduler;
     @Autowired
+    private LatestPriceCache latestPriceCache;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -59,6 +62,7 @@ class TradeExecutionRollbackTest {
         reset(tradeMapper);
 
         jdbcTemplate.update("DELETE FROM trades");
+        latestPriceCache.clear(); // scheduler-mocked away: drop stale cached prices from the previous test
         jdbcTemplate.update("DELETE FROM crypto_prices");
         jdbcTemplate.update("DELETE FROM user_wallets");
         jdbcTemplate.update("""

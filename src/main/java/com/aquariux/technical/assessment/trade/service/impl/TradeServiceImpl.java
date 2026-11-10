@@ -1,5 +1,6 @@
 package com.aquariux.technical.assessment.trade.service.impl;
 
+import com.aquariux.technical.assessment.trade.cache.LatestPriceCache;
 import com.aquariux.technical.assessment.trade.dto.internal.PairSymbolsDto;
 import com.aquariux.technical.assessment.trade.dto.request.TradeRequest;
 import com.aquariux.technical.assessment.trade.dto.response.TradeResponse;
@@ -11,7 +12,6 @@ import com.aquariux.technical.assessment.trade.exception.InvalidTradeRequestExce
 import com.aquariux.technical.assessment.trade.exception.PriceNotAvailableException;
 import com.aquariux.technical.assessment.trade.exception.UserNotFoundException;
 import com.aquariux.technical.assessment.trade.mapper.CryptoPairMapper;
-import com.aquariux.technical.assessment.trade.mapper.CryptoPriceMapper;
 import com.aquariux.technical.assessment.trade.mapper.TradeMapper;
 import com.aquariux.technical.assessment.trade.mapper.UserMapper;
 import com.aquariux.technical.assessment.trade.service.TradeServiceInterface;
@@ -28,7 +28,8 @@ import java.time.LocalDateTime;
  * Market-order trade execution engine.
  *
  * <p>Execution model (broker-style, no order book): the latest aggregated best
- * price stored by the price scheduler is used directly. BUY fills at the pair's
+ * price stored by the price scheduler (served from an in-memory cache that
+ * the scheduler keeps fresh) is used directly. BUY fills at the pair's
  * best ask, SELL at the pair's best bid; the full requested quantity is filled
  * at that single price (implicit infinite liquidity).
  *
@@ -48,7 +49,7 @@ public class TradeServiceImpl implements TradeServiceInterface {
 
     private final UserMapper userMapper;
     private final CryptoPairMapper cryptoPairMapper;
-    private final CryptoPriceMapper cryptoPriceMapper;
+    private final LatestPriceCache latestPriceCache;
     private final TradeMapper tradeMapper;
     private final WalletServiceInterface walletService;
 
@@ -66,7 +67,7 @@ public class TradeServiceImpl implements TradeServiceInterface {
             throw new CryptoPairNotFoundException(tradeRequest.getPairName());
         }
 
-        CryptoPrice price = cryptoPriceMapper.findLatestByPairName(pair.getPairName());
+        CryptoPrice price = latestPriceCache.getLatestForPair(pair.getPairId());
         if (price == null) {
             throw new PriceNotAvailableException(pair.getPairName());
         }
