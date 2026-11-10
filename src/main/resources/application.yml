@@ -1,6 +1,12 @@
 spring:
   application:
     name: aquariux-backend
+  threads:
+    virtual:
+      # Tomcat request handling and Spring stack on virtual threads: 100
+      # simultaneous trades no longer compete for platform carrier threads,
+      # which keeps tail latency (p99) from bloating under burst load.
+      enabled: true
   datasource:
     url: jdbc:h2:mem:aquariux
     driver-class-name: org.h2.Driver
